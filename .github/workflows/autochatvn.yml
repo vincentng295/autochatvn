@@ -1,0 +1,41 @@
+name: Dispatch Workflow
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  setup-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run autochatvn.py with GENKEY
+        run: |
+          if [ -n "$GENKEY" ]; then
+            python3 autochatvn_timeout.py
+          fi
+        shell: bash
+        env:
+          PYTHONUNBUFFERED: "1"
+          GENKEY: ${{ secrets.GENKEY }}
+          TOKEN: ${{ secrets.TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conversation
+          path: |
+            files/
