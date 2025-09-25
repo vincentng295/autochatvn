@@ -240,7 +240,7 @@ try:
                     new_list.insert(0, {"role": "system", "message": text})
             
             if get_message_input():
-                if int(time.time()) - last_time_ts >= 5*60:
+                if int(time.time()) - last_time_ts >= 3*60:
                     time.sleep(5)
                     exit_chat()
                     last_time_ts = int(time.time())
