@@ -151,7 +151,7 @@ try:
     genai.configure(api_key=genai_key)
     existing_files = {f.name: f for f in genai.list_files()}
     model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
+        model_name="gemini-2.5-flash",
         system_instruction=instruction,  # Your overall guidance to the model
         safety_settings={
             'harm_category_harassment': 'BLOCK_NONE',
