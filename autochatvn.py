@@ -41,6 +41,20 @@ def print_with_time(*args, sep=" ", end="\n", file=None, flush=False):
 
 sys.stdout.reconfigure(encoding='utf-8')
 
+def js_input(driver, e, content):
+    driver.execute_async_script("""
+    var e = arguments[0];
+    var strings = arguments[1];
+    var callback = arguments[2]; // Selenium's built-in async callback
+
+    e.focus();
+    document.execCommand("insertText", false, strings);
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+    e.dispatchEvent(new Event('change', { bubbles: true }));
+
+    callback();
+    """, e, content)
+
 genai_key = os.getenv("GENKEY")
 access_token = os.getenv("TOKEN")
 headless = os.getenv("HEADLESS", "1") == "1"
@@ -334,12 +348,11 @@ try:
                 try:
                     # Example usage
                     input_box = get_message_input()
-                    text_to_send = remove_non_bmp_characters(replace_emoji_with_shortcut(reply_msg + "\n"))
 
                     input_box.send_keys(Keys.CONTROL + "a")  # Select all text
                     input_box.send_keys(Keys.DELETE)  # Delete the selected text
-                    input_box.send_keys(text_to_send)
-                    #human_typing(input_box, text_to_send)
+                    js_input(driver, input_box, reply_msg)
+                    input_box.send_keys(Keys.ENTER)  # Press Enter to send the message
 
                     msg_list.extend(new_list)
                     msg_list.append({"role": "me", "message": reply_msg, "time" : get_day_and_time() })
