@@ -20,7 +20,9 @@ from selenium.common.exceptions import *  # For handling exceptions
 from selenium.webdriver.common.keys import Keys  # For keyboard actions
 from selenium.common.exceptions import *
 from selenium.webdriver.chrome.options import Options
-import google.generativeai as genai  # For generative AI functionalities
+from google import genai
+from google.genai import types # Needed for multimodal content like images
+from google.genai.types import HarmCategory, HarmBlockThreshold, GenerateContentConfig, SafetySetting, UploadFileConfig, FileState, GoogleSearch, Tool, HttpOptions
 from utils import *  # For custom utility functions
 import json
 import time
@@ -74,6 +76,7 @@ rules_prompt = """
 - If a user repeats words or phrases excessively, recognize the loop and switch tone, example: “I’ve heard this episode before—got a sequel?”
 - If users spam emojis, reactions, or teencode, only respond if the message has meaningful context. Otherwise, ignore or playfully acknowledge it.
 - Always keep the conversation fresh, natural, and fun—like chatting with a clever human who knows how to joke, tease back, and keep it interesting.
+- It is best to avoid using exclamation marks "!", question marks "?" or periods at the end of messages while talking to look more human.
 - Provide only the response content without introductory phrases or multiple options.
 """
 
@@ -148,18 +151,28 @@ try:
 
     instruction = get_instructions_prompt(ai_prompt, rules_prompt)
     # Setup persona instruction
-    genai.configure(api_key=genai_key)
-    existing_files = {f.name: f for f in genai.list_files()}
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=instruction,  # Your overall guidance to the model
-        safety_settings={
-            'harm_category_harassment': 'BLOCK_NONE',
-            'harm_category_hate_speech': 'BLOCK_NONE',
-            'harm_category_sexually_explicit': 'BLOCK_NONE',
-            'harm_category_dangerous_content': 'BLOCK_NONE',
-        }
-    )
+    GEMINI_TIMEOUT =  3 * 60 * 1000 # 3 minutes
+    client = genai.Client(api_key=genai_key, http_options=HttpOptions(timeout=GEMINI_TIMEOUT))
+
+    
+    safety_settings = [ # This must be a list of SafetySetting objects
+                SafetySetting(
+                    category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold=HarmBlockThreshold.BLOCK_NONE,
+                ),
+                SafetySetting(
+                    category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold=HarmBlockThreshold.BLOCK_NONE,
+                ),
+                SafetySetting(
+                    category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold=HarmBlockThreshold.BLOCK_NONE,
+                ),
+                SafetySetting(
+                    category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold=HarmBlockThreshold.BLOCK_NONE,
+                )
+            ]
 
     def human_typing(element, text, min_delay=0.01, max_delay=0.05):
         for char in text:
@@ -168,6 +181,16 @@ try:
 
     for text in instruction:
         print_with_time(text)
+
+
+    def reply_generate_content(parts):
+        return client.models.generate_content(
+            model="gemma-3-27b-it",  # Specify the model to use
+            contents=parts,
+            config = GenerateContentConfig(
+                safety_settings=safety_settings,
+            )
+        )
 
     print_with_time("Bắt đầu khởi động!")
 
@@ -292,7 +315,7 @@ try:
                 continue
             last_time_ts = int(time.time())
             print_with_time("------")
-            prompt_list = ["The conversation with stranger is as json here:"]
+            prompt_list = [instruction, "The conversation with stranger is as json here:"]
             for msg_item in msg_list:
                 prompt_list.append(json.dumps(msg_item, ensure_ascii=False))
             for msg_item in new_list:
@@ -302,14 +325,9 @@ try:
             
             prompt_list.insert(0, get_day_and_time())
             exam = json.dumps({"role": "me", "message": "Hello there!"}, ensure_ascii=False)
-            prompt_list.append(f'Generate a response in properly formatted JSON to reply back to user.\nExample:\n{exam}\n')
-            response = model.generate_content(prompt_list, generation_config=genai.GenerationConfig(
-                                            response_mime_type="application/json"
-                                        ),)
-            caption = response.text
-            
-            json_msg = fix_json(caption)
-            reply_msg = json_msg["message"]
+            prompt_list.append(f'Generate a response in text to reply back to user\n')
+            response = reply_generate_content(prompt_list)
+            reply_msg = response.text
             print_with_time("AI trả lời: " + reply_msg)
             reply_msg, bot_commands = extract_keywords(r'\[cmd\](.*?)\[/cmd\]', reply_msg)
             for _ in range(5):
