@@ -56,7 +56,20 @@ def js_input(driver, e, content):
     """, e, content)
 
 genai_key = os.getenv("GENKEY")
+if not genai_key:
+    with open("genai_key.txt", "r") as f:
+        genai_key = f.read().strip()
+else: # save genai key to file for later use
+    with open("genai_key.txt", "w") as f:
+        f.write(genai_key)
 access_token = os.getenv("TOKEN")
+# same with token
+if not access_token:
+    with open("token.txt", "r") as f:
+        access_token = f.read().strip()
+else: # save token to file for later use
+    with open("token.txt", "w") as f:
+        f.write(access_token)
 headless = os.getenv("HEADLESS", "1") == "1"
 
 f_intro_txt = "setup/introduction.txt"
